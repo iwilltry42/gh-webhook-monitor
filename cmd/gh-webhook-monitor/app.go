@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	jwt "github.com/dgrijalva/jwt-go"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"time"
+
+	jwt "github.com/dgrijalva/jwt-go"
+	log "github.com/sirupsen/logrus"
 )
 
 // simplifiedGitHubInstallationAccessTokenResponse is a simple representation of the response you get when requesting
@@ -60,13 +61,13 @@ func generateJWT(appID string, pemFile string) (string, error) {
 }
 
 // getGitHubAppInstallationToken uses a JWT token to eventually get an app installation token for git auth
-func getGitHubAppInstallationToken(ctx context.Context, appID, appPem, appInstId string) (string, time.Time, error) {
-	appToken, err := generateJWT(appID, appPem)
+func getGitHubAppInstallationToken(ctx context.Context, ghApp GitHubApp) (string, time.Time, error) {
+	appToken, err := generateJWT(ghApp.ID, ghApp.PemFile)
 	if err != nil {
 		return "", time.Time{}, err
 	}
 
-	appInstToken, tokenExpirationTime, err := getInstallationToken(appToken, appInstId)
+	appInstToken, tokenExpirationTime, err := getInstallationToken(appToken, ghApp.InstallationID)
 	if err != nil {
 		return "", time.Time{}, err
 	}
