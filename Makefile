@@ -27,8 +27,8 @@ IMAGE_TAG := $(GIT_TAG)
 ########## Source Options ##########
 # DIRS defines a single level directly, we only look at *.go in this directory.
 # REC_DIRS defines a source code tree. All go files are analyzed recursively.
-DIRS :=  .
-REC_DIRS := cmd
+DIRS :=
+REC_DIRS := cmd pkg
 
 ########## Go Build Options ##########
 # Build targets

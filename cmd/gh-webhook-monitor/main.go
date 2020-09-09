@@ -50,14 +50,15 @@ type GitHubApp struct {
 	InstallationToken GitHubAppInstallationToken
 }
 
-var GHApp GitHubApp
-
-var Repositories []string
+var (
+	GHApp        GitHubApp
+	Repositories []string
+)
 
 // repoRegexp matches several variants of repo addresses that can be passed to this application
 var repoRegexp = regexp.MustCompile(`^(?P<protocol>http://|https://|git@)?(?P<github_domain>github\.com)?/?(?P<owner>[A-Za-z0-9-_]+)/(?P<repo>[A-Za-z0-9-_]+)(\.git|/.*)?`)
 
-func main() {
+func configFromEnv() error {
 	GHApp = GitHubApp{
 		ID:             os.Getenv("GWM_GH_APP_ID"),
 		InstallationID: os.Getenv("GWM_GH_APP_INST_ID"),
@@ -70,7 +71,7 @@ func main() {
 	for _, repoURL := range repoURLList {
 		match := repoRegexp.FindStringSubmatch(repoURL)
 		if len(match) == 0 {
-			log.Fatalf("Failed to match repo regexp on repo %s", repoURL)
+			return fmt.Errorf("Failed to match repo regexp on repo %s", repoURL)
 		}
 
 		submatches := mapSubexpNames(repoRegexp.SubexpNames(), match)
@@ -82,7 +83,16 @@ func main() {
 		Repositories = append(Repositories, repo)
 	}
 
+	return nil
+}
+
+func main() {
 	var err error
+
+	if err = configFromEnv(); err != nil {
+		log.Errorln("Failed to create configuration")
+		log.Fatalln(err)
+	}
 
 	GHApp.InstallationToken.Token, GHApp.InstallationToken.ExpiresAt, err = getGitHubAppInstallationToken(context.Background(), GHApp)
 	if err != nil {
