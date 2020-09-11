@@ -79,7 +79,7 @@ func configFromEnv() error {
 		var err error
 		WaitTime, err = time.ParseDuration(wt)
 		if err != nil {
-			log.Errorf("Failed to parse wait time '%s' to time.Duration format", os.Getenv("GWM_WAIT_TIME"))
+			log.Errorf("Failed to parse wait time '%s' to time.Duration format", wt)
 			os.Exit(1)
 		}
 	}
