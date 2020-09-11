@@ -80,6 +80,12 @@ func configFromEnv() error {
 	Repositories = []string{}
 
 	for _, repoURL := range repoURLList {
+		repoURL = strings.TrimSpace(repoURL)
+
+		if repoURL == "" {
+			continue
+		}
+
 		match := repoRegexp.FindStringSubmatch(repoURL)
 		if len(match) == 0 {
 			return fmt.Errorf("Failed to match repo regexp on repo %s", repoURL)

@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Values.name }}"
+  labels:
+    {{ toYaml .Values.labels }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{ toYaml .Values.labels }}
+  template:
+    metadata:
+      labels:
+        {{ toYaml .Values.labels }}
+    spec:
+      containers:
+        - name: "{{ .Values.name }}"
+          image: "{{ .Values.image }}"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - name: prometheus
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: prometheus
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: prometheus
+          volumeMounts:
+            - mountPath: /gh/app.pem
+              name: gh-app-pem
+          envFrom:
+            - secretRef:
+                name: {{ .Values.envFromSecret }}
+          env:
+            - name: GWM_GH_APP_PEM
+              value: /gh/app.pem
+            {{- if .Values.repos }}
+            - name: GWM_REPOS
+              value: "{{- range $_, $repo := .Values.repos -}}{{$repo}},{{- end -}}"
+            {{- end }}
+      volumes:
+        - name: gh-app-pem
+          secret:
+            secretName: {{ .Values.pemSecret }}

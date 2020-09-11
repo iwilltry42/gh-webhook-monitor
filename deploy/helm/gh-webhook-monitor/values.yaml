@@ -1,0 +1,13 @@
+name: gh-webhook-monitor
+image: iwilltry42/gh-webhook-monitor:20200911.0
+imagePullPolicy: IfNotPresent
+labels:
+  app: gh-webhook-monitor
+pemSecret: gh-app-pem
+envFromSecret: gh-webhook-monitor
+repos:
+  - trivago/mpops-prometheus-stack
+  - trivago/mpops-secrets
+  - trivago/bm-live-c2b-training-data
+  - trivago/ad-ctr-prediction
+  - trivago/ikigai
