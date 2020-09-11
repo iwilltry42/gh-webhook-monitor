@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -53,6 +54,11 @@ type GitHubApp struct {
 var (
 	GHApp        GitHubApp
 	Repositories []string
+	WaitTime     time.Duration
+)
+
+const (
+	DEFAULT_WAIT_TIME = 5 * time.Minute
 )
 
 // repoRegexp matches several variants of repo addresses that can be passed to this application
@@ -65,6 +71,11 @@ func configFromEnv() error {
 		PemFile:        os.Getenv("GWM_GH_APP_PEM"),
 	}
 	repoURLList := strings.Split(os.Getenv("GWM_REPOS"), ",")
+	wt, err := time.ParseDuration(os.Getenv("GWM_WAIT_TIME"))
+	if err != nil {
+		wt = DEFAULT_WAIT_TIME
+	}
+	WaitTime = wt
 
 	Repositories = []string{}
 
@@ -86,52 +97,74 @@ func configFromEnv() error {
 	return nil
 }
 
+func checkWebhooks() {
+	var err error
+
+	for {
+		// renew token in case it expired
+		if time.Now().After(GHApp.InstallationToken.ExpiresAt) {
+			GHApp.InstallationToken.Token, GHApp.InstallationToken.ExpiresAt, err = getGitHubAppInstallationToken(context.Background(), GHApp)
+			if err != nil {
+				log.Errorln("Failed to get GH App Installation Token")
+				log.Fatalln(err)
+			}
+		}
+
+		// get webhooks from all repositories
+		for _, repo := range Repositories {
+			resp, err := doRequest(GHApp.InstallationToken.Token, fmt.Sprintf("https://api.github.com/repos/%s/hooks", repo), http.MethodGet)
+			if err != nil {
+				log.Errorf("Failed to get hooks for repo '%s'", repo)
+				repositoryFailedWebhookList.WithLabelValues(repo, "requestError").Inc()
+			}
+
+			var hookResponse []ghRepositoryHook
+
+			respBody, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Errorln("Failed to read response body\n%w", err)
+				repositoryFailedWebhookList.WithLabelValues(repo, "readResponseError").Inc()
+			}
+
+			resp.Body.Close()
+
+			if err := json.Unmarshal(respBody, &hookResponse); err != nil {
+				log.Errorf("Failed to unmarshal hook response for repo '%s'", repo)
+				repositoryFailedWebhookList.WithLabelValues(repo, "unmarshalResponseBodyError").Inc()
+			}
+
+			for _, hook := range hookResponse {
+				log.Infof("-> %s -> %s -> %d", repo, hook.URL, hook.LastResponse.Code)
+				webhookLastStatusCode.WithLabelValues(repo, hook.URL, fmt.Sprintf("%d", hook.LastResponse.Code)).Inc()
+			}
+		}
+
+		log.Infof("Waiting for %s...", WaitTime)
+		time.Sleep(WaitTime)
+	}
+}
+
 func main() {
 	var err error
 
+	// expose metrics for Prometheus
+	http.Handle("/metrics", promhttp.Handler())
+
+	// configure application from environment variables
 	if err = configFromEnv(); err != nil {
 		log.Errorln("Failed to create configuration")
 		log.Fatalln(err)
 	}
 
+	// authenticate against GitHub as a GitHub app
 	GHApp.InstallationToken.Token, GHApp.InstallationToken.ExpiresAt, err = getGitHubAppInstallationToken(context.Background(), GHApp)
 	if err != nil {
 		log.Errorln("Failed to get GH App Installation Token")
 		log.Fatalln(err)
 	}
 
-	if time.Now().After(GHApp.InstallationToken.ExpiresAt) {
-		GHApp.InstallationToken.Token, GHApp.InstallationToken.ExpiresAt, err = getGitHubAppInstallationToken(context.Background(), GHApp)
-		if err != nil {
-			log.Errorln("Failed to get GH App Installation Token")
-			log.Fatalln(err)
-		}
-	}
+	go checkWebhooks()
 
-	for _, repo := range Repositories {
-		resp, err := doRequest(GHApp.InstallationToken.Token, fmt.Sprintf("https://api.github.com/repos/%s/hooks", repo), http.MethodGet)
-		if err != nil {
-			log.Errorf("Failed to get hooks for repo '%s'", repo)
-			log.Fatalln(err)
-		}
-		defer resp.Body.Close()
+	log.Fatal(http.ListenAndServe(":8080", nil))
 
-		var hookResponse []ghRepositoryHook
-
-		respBody, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Errorln("Failed to read response body")
-			log.Fatalln(err)
-		}
-		resp.Body.Close()
-
-		if err := json.Unmarshal(respBody, &hookResponse); err != nil {
-			log.Errorf("Failed to unmarshal hook response for repo '%s'", repo)
-			log.Fatalln(err)
-		}
-
-		for _, hook := range hookResponse {
-			log.Infof("-> %s -> %s -> %d", repo, hook.URL, hook.LastResponse.Code)
-		}
-	}
 }
