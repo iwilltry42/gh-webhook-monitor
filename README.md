@@ -5,6 +5,7 @@ Prometheus Metrics Exporter for GitHub Repository Webhook Statuses
 ## Overview
 
 - Exposes metrics on `:8080/metrics`
+- Docker Image: [iwilltry42/gh-webhook-monitor](https://hub.docker.com/r/iwilltry42/gh-webhook-monitor/tags)
 
 ## Configuration
 
