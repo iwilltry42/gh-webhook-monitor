@@ -40,6 +40,10 @@ spec:
           env:
             - name: GWM_GH_APP_PEM
               value: /gh/app.pem
+            {{- if .Values.webhookTargetURLFilterRegexp }}
+            - name: GWM_WEBHOOK_REGEXP
+              value: {{ .Values.webhookTargetURLFilterRegexp }}
+            {{- end }}
             {{- if .Values.repos }}
             - name: GWM_REPOS
               value: "{{- range $_, $repo := .Values.repos -}}{{$repo}},{{- end -}}"

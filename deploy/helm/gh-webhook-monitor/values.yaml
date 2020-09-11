@@ -1,8 +1,9 @@
 name: gh-webhook-monitor
-image: iwilltry42/gh-webhook-monitor:v0.0.2
+image: iwilltry42/gh-webhook-monitor:v0.0.3
 imagePullPolicy: IfNotPresent
 labels:
   app: gh-webhook-monitor
 pemSecret: gh-app-pem
 envFromSecret: gh-webhook-monitor
+webhookTargetURLFilterRegexp: ""
 repos: []
