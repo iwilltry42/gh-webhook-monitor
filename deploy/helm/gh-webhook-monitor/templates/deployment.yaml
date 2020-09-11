@@ -33,6 +33,7 @@ spec:
           volumeMounts:
             - mountPath: /gh/app.pem
               name: gh-app-pem
+              subPath: app.pem
           envFrom:
             - secretRef:
                 name: {{ .Values.envFromSecret }}
