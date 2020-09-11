@@ -92,10 +92,14 @@ build-cross: LDFLAGS += -extldflags "-static"
 build-cross:
 	CGO_ENABLED=0 gox -parallel=3 -output="_dist/$(BINARIES)-{{.OS}}-{{.Arch}}" -osarch='$(TARGETS)' $(GOFLAGS) $(if $(TAGS),-tags '$(TAGS)',) -ldflags '$(LDFLAGS)'
 
-# build a specific docker target ( '%' matches the target as specified in the Dockerfile)
-build-docker-%:
-	@echo "Building Docker image gh-webhook-monitor:$(IMAGE_TAG)-$*"
-	docker build . -t gh-webhook-monitor:$(IMAGE_TAG)-$* --target $*
+# build docker image
+docker-build:
+	@echo "Building Docker image iwilltry42/gh-webhook-monitor:$(GIT_TAG)"
+	docker build . -t iwilltry42/gh-webhook-monitor:$(GIT_TAG)
+
+docker-push:
+	@echo "Pushing Docker image iwilltry42/gh-webhook-monitor:$(GIT_TAG)"
+	docker push iwilltry42/gh-webhook-monitor:$(GIT_TAG)
 
 ##############################
 ########## Cleaning ##########
