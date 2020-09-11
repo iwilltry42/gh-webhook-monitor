@@ -71,11 +71,18 @@ func configFromEnv() error {
 		PemFile:        os.Getenv("GWM_GH_APP_PEM"),
 	}
 	repoURLList := strings.Split(os.Getenv("GWM_REPOS"), ",")
-	wt, err := time.ParseDuration(os.Getenv("GWM_WAIT_TIME"))
-	if err != nil {
-		wt = DEFAULT_WAIT_TIME
+	wt := strings.TrimSpace(os.Getenv("GWM_WAIT_TIME"))
+
+	if wt == "" {
+		WaitTime = DEFAULT_WAIT_TIME
+	} else {
+		var err error
+		WaitTime, err = time.ParseDuration(wt)
+		if err != nil {
+			log.Errorf("Failed to parse wait time '%s' to time.Duration format", os.Getenv("GWM_WAIT_TIME"))
+			os.Exit(1)
+		}
 	}
-	WaitTime = wt
 
 	Repositories = []string{}
 
