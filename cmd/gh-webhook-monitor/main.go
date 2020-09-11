@@ -22,6 +22,12 @@ type ghRepositoryHookLastResponse struct {
 	Message string `json:"message"`
 }
 
+type ghRepositoryHookConfig struct {
+	ContentType string `json:"content_type"`
+	InsecureSSL string `json:"insecure_ssl"`
+	URL         string `json:"url"`
+}
+
 // ghRepositoryHook represents a single list item of the GitHub repository webhook API response
 type ghRepositoryHook struct {
 	Type         string                       `json:"type"`
@@ -29,7 +35,7 @@ type ghRepositoryHook struct {
 	Name         string                       `json:"name"`
 	Active       bool                         `json:"active"`
 	Events       []string                     `json:"events"`
-	Config       map[string]interface{}       `json:"config"`
+	Config       ghRepositoryHookConfig       `json:"config"`
 	UpdatedAt    time.Time                    `json:"updated_at"`
 	CreatedAt    time.Time                    `json:"created_at"`
 	URL          string                       `json:"url"`
@@ -52,9 +58,10 @@ type GitHubApp struct {
 }
 
 var (
-	GHApp        GitHubApp
-	Repositories []string
-	WaitTime     time.Duration
+	GHApp         GitHubApp
+	Repositories  []string
+	WebhookRegexp *regexp.Regexp
+	WaitTime      time.Duration
 )
 
 const (
@@ -82,6 +89,11 @@ func configFromEnv() error {
 			log.Errorf("Failed to parse wait time '%s' to time.Duration format", wt)
 			os.Exit(1)
 		}
+	}
+
+	webhookRegexpStr := strings.TrimSpace(os.Getenv("GWM_WEBHOOK_REGEXP"))
+	if webhookRegexpStr != "" {
+		WebhookRegexp = regexp.MustCompile(webhookRegexpStr)
 	}
 
 	Repositories = []string{}
@@ -147,8 +159,12 @@ func checkWebhooks() {
 			}
 
 			for _, hook := range hookResponse {
-				log.Infof("-> %s -> %s -> %d", repo, hook.URL, hook.LastResponse.Code)
-				webhookLastStatusCode.WithLabelValues(repo, hook.URL, fmt.Sprintf("%d", hook.LastResponse.Code)).Inc()
+				if WebhookRegexp != nil && !WebhookRegexp.MatchString(hook.Config.URL) {
+					log.Infof("Webhook Target URL '%s' does not match provided Regexp ('%s'), ignoring...", hook.Config.URL, WebhookRegexp)
+					continue
+				}
+				log.Infof("Repo %s - Hook %s -> %s :: %d", repo, hook.URL, hook.Config.URL, hook.LastResponse.Code)
+				webhookLastStatusCode.WithLabelValues(repo, hook.URL, hook.Config.URL, fmt.Sprintf("%d", hook.LastResponse.Code)).Inc()
 			}
 		}
 

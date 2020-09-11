@@ -12,6 +12,7 @@ var (
 	}, []string{
 		"repository",
 		"webhook",
+		"target",
 		"code",
 	})
 
