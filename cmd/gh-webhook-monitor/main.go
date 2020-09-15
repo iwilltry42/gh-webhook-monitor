@@ -93,7 +93,6 @@ func checkWebhooks(ctx context.Context, ghApp *ghapi.GitHubApp, repos []string) 
 		resp, err := ghApp.DoAPIRequest(http.MethodGet, fmt.Sprintf("/repos/%s/hooks", repo))
 		if err != nil {
 			log.Errorf("Failed to get hooks for repo '%s'\n%+v", repo, err)
-			log.Errorf("%+v", ghApp)
 			metrics.RepositoryFailedWebhookList.WithLabelValues(repo, "requestError").Inc()
 			continue
 		}
@@ -102,7 +101,7 @@ func checkWebhooks(ctx context.Context, ghApp *ghapi.GitHubApp, repos []string) 
 
 		respBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Errorln("Failed to read response body\n%w", err)
+			log.Errorf("Failed to read response body\n%+v", err)
 			metrics.RepositoryFailedWebhookList.WithLabelValues(repo, "readResponseError").Inc()
 			continue
 		}
