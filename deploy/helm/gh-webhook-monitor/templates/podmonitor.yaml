@@ -2,7 +2,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   labels:
-    {{ toYaml .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
   name: {{ .Values.name }}
   namespace: {{ .Release.Namespace }}
 spec:
@@ -11,4 +11,4 @@ spec:
       interval: 15s   # how often this endpoint should be scraped
   selector:
     matchLabels:    # set of labels to detect service objects by
-      {{ toYaml .Values.labels }}
+      {{- toYaml .Values.labels | nindent 6 }}
