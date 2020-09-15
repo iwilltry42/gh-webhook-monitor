@@ -56,6 +56,12 @@ spec:
             - name: GWM_REPOS_FILTER_TEAM_SLUGS
               value: "{{- range $_, $repo := .Values.repoFilters.teams -}}{{$repo}},{{- end -}}"
             {{- end }}
+            {{- if .Values.extraEnv }}
+            {{- range $k, $v := .Values.extraEnv }}
+            - name: "{{ $k }}"
+              value: "{{ $v }}"
+            {{- end }}
+            {{- end }}
       volumes:
         - name: gh-app-pem
           secret:
