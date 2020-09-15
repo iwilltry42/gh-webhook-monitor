@@ -59,22 +59,11 @@ func configFromEnv() (*ghapi.GitHubAppInstallation, *types.TargetRepositoryListC
 		WebhookTargetRegexp = regexp.MustCompile(webhookTargetRegexp)
 	}
 
-	// Generate List of repositories
-	repoURLList := strings.Split(os.Getenv("GWM_REPOS_INCLUDE"), ",")
+	// Generate Repository Search Config
 	targetRepositoryListConfig := types.TargetRepositoryListConfig{}
 
-	targetRepositoryListConfig.IncludeRepositories = []string{}
-
-	for _, repoURL := range repoURLList {
-		repo, ok := ghapi.ValidateAndNormalizeRepositoryIdentifier(repoURL)
-		if !ok {
-			return nil, nil, 0, fmt.Errorf("Cannot handle repository: Invalid repository identifier '%s'", repoURL)
-		}
-
-		log.Infof("Handling repo '%s'", repo)
-
-		targetRepositoryListConfig.IncludeRepositories = append(targetRepositoryListConfig.IncludeRepositories, repo)
-	}
+	targetRepositoryListConfig.IncludeRepositories = strings.Split(os.Getenv("GWM_REPOS_INCLUDE"), ",")
+	targetRepositoryListConfig.FilterTeamSlugs = strings.Split(os.Getenv("GWM_REPOS_FILTER_TEAM_SLUG"), ",")
 
 	return &ghAppInstallation, &targetRepositoryListConfig, waitTime, nil
 }
