@@ -58,3 +58,12 @@ type RepositoryListConfig struct {
 	ExcludeRepositoryRegexp    *regexp.Regexp
 	IncludeRepositoryTeamSlugs []string
 }
+
+// SimplifiedGitHubInstallationAccessTokenResponse is a simple representation of the response you get when requesting
+// a GitHub App installation token (see https://docs.github.com/en/rest/reference/apps#create-an-installation-access-token-for-an-app)
+type SimplifiedGitHubInstallationAccessTokenResponse struct {
+	Token               string            `json:"token"`
+	ExpiresAt           time.Time         `json:"expires_at"`
+	RepositorySelection string            `json:"repository_selection"`
+	Permissions         map[string]string `json:"permissions"`
+}

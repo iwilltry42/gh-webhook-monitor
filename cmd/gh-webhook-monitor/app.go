@@ -14,17 +14,9 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/iwilltry42/gh-webhook-monitor/pkg/types"
 	log "github.com/sirupsen/logrus"
 )
-
-// simplifiedGitHubInstallationAccessTokenResponse is a simple representation of the response you get when requesting
-// a GitHub App installation token (see https://docs.github.com/en/rest/reference/apps#create-an-installation-access-token-for-an-app)
-type simplifiedGitHubInstallationAccessTokenResponse struct {
-	Token               string            `json:"token"`
-	ExpiresAt           time.Time         `json:"expires_at"`
-	RepositorySelection string            `json:"repository_selection"`
-	Permissions         map[string]string `json:"permissions"`
-}
 
 // generateJWT generates a new JSON Web Token out of the App's private pem
 func generateJWT(appID string, pemFile string) (string, error) {
@@ -61,7 +53,7 @@ func generateJWT(appID string, pemFile string) (string, error) {
 }
 
 // getGitHubAppInstallationToken uses a JWT token to eventually get an app installation token for git auth
-func getGitHubAppInstallationToken(ctx context.Context, ghApp GitHubApp) (string, time.Time, error) {
+func getGitHubAppInstallationToken(ctx context.Context, ghApp types.GitHubApp) (string, time.Time, error) {
 	appToken, err := generateJWT(ghApp.ID, ghApp.PemFile)
 	if err != nil {
 		return "", time.Time{}, err
@@ -111,7 +103,7 @@ func getInstallationToken(token, installationID string) (string, time.Time, erro
 		return "", time.Time{}, err
 	}
 
-	var response simplifiedGitHubInstallationAccessTokenResponse
+	var response types.SimplifiedGitHubInstallationAccessTokenResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return "", time.Time{}, err
 	}
