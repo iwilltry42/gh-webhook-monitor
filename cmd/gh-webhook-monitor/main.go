@@ -153,6 +153,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	// get list of repositories
+	repos, err := ghapi.GenerateRepoList(context.Background(), ghAppInstallation, repoListConfig)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	// continuously check webhook statuses for all repos
 	go func(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, waitTime time.Duration, repositories []string) {
 		for {
@@ -160,7 +166,7 @@ func main() {
 			log.Infof("Waiting for %s...", waitTime)
 			time.Sleep(waitTime)
 		}
-	}(context.Background(), ghAppInstallation, waitTime, repoListConfig.IncludeRepositories)
+	}(context.Background(), ghAppInstallation, waitTime, repos)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 
