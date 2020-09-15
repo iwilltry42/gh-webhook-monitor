@@ -41,7 +41,7 @@ spec:
             - name: GWM_GH_APP_PEM
               value: /gh/app.pem
             {{- if .Values.webhookFilters.targetURLRegexp }}
-            - name: GWM_WEBHOOK_FILTERS_TARGET_REGEXP
+            - name: GWM_WEBHOOK_FILTER_TARGET_REGEXP
               value: {{ .Values.webhookFilters.targetURLRegexp }}
             {{- end }}
             {{- if .Values.repoFilters.include }}
