@@ -63,7 +63,7 @@ func configFromEnv() (*ghapi.GitHubAppInstallation, *types.TargetRepositoryListC
 	targetRepositoryListConfig := types.TargetRepositoryListConfig{}
 
 	targetRepositoryListConfig.IncludeRepositories = strings.Split(os.Getenv("GWM_REPOS_INCLUDE"), ",")
-	targetRepositoryListConfig.FilterTeamSlugs = strings.Split(os.Getenv("GWM_REPOS_FILTER_TEAM_SLUG"), ",")
+	targetRepositoryListConfig.FilterTeamSlugs = strings.Split(os.Getenv("GWM_REPOS_FILTER_TEAM_SLUGS"), ",")
 
 	return &ghAppInstallation, &targetRepositoryListConfig, waitTime, nil
 }
