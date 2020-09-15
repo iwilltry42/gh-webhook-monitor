@@ -2,12 +2,17 @@ package ghapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/iwilltry42/gh-webhook-monitor/pkg/types"
 	"github.com/iwilltry42/gh-webhook-monitor/pkg/util"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // repoRegexp matches several variants of repo addresses that can be passed to this application
@@ -31,22 +36,84 @@ func ValidateAndNormalizeRepositoryIdentifier(identifier string) (string, bool) 
 	return fmt.Sprintf("%s/%s", submatches["owner"], submatches["repo"]), true
 }
 
-func (ghApp *GitHubApp) GetReposByTeamSlug(teamSlug string) ([]string, error) {
-	return nil, nil
+func (ghAppInstallation *GitHubAppInstallation) GetReposByTeamSlug(teamSlug string) ([]string, error) {
+	resp, err := ghAppInstallation.DoAPIRequest(http.MethodGet, fmt.Sprintf("/orgs/%s/teams/%s/repos", ghAppInstallation.Organization, teamSlug))
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []GHAPIResponseRepos
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, err
+	}
+
+	repos := []string{}
+	for _, repo := range response {
+		r, ok := ValidateAndNormalizeRepositoryIdentifier(repo.FullName)
+		if !ok {
+			return nil, fmt.Errorf("Failed to validate repo '%s'", repo.FullName)
+		}
+		repos = append(repos, r)
+	}
+
+	return repos, nil
 }
 
 // GenerateRepoList generates a list of repositories to target for inspection
-func GenerateRepoList(ctx context.Context, ghApp *GitHubApp, config *types.TargetRepositoryListConfig) ([]string, error) {
-	repos := []string{}
+func GenerateRepoList(ctx context.Context, ghAppInstallation *GitHubAppInstallation, config *types.TargetRepositoryListConfig) ([]string, error) {
+	repos := make(map[string]bool, 1)
 
+	if config.FilterTeamSlugs != nil {
+		for _, teamSlug := range config.FilterTeamSlugs {
+			log.Debugf("Fetching repos for team '%s'...", teamSlug)
+			newRepos, err := ghAppInstallation.GetReposByTeamSlug(teamSlug)
+			if err != nil {
+				return nil, err
+			}
+
+			// only add repos that are not already in the list
+			for _, newRepo := range newRepos {
+				if _, exists := repos[newRepo]; !exists {
+					repos[newRepo] = true
+				}
+			}
+		}
+	}
+
+	// drop repos which are on the exlusion list
+	for repo := range repos {
+		for _, nope := range config.ExcludeRepositories {
+			excludeRepo, ok := ValidateAndNormalizeRepositoryIdentifier(nope)
+			if !ok {
+				return nil, fmt.Errorf("Failed to validate repo from exclusion list '%s'", nope)
+			}
+			if repo == excludeRepo {
+				delete(repos, repo)
+			}
+		}
+	}
+
+	// add repos that are on the inclusion list
 	for _, repo := range config.IncludeRepositories {
 		if r, ok := ValidateAndNormalizeRepositoryIdentifier(repo); ok {
-			repos = append(repos, r)
+			repos[r] = true
 		} else {
 			return nil, fmt.Errorf("Failed to validate repository identifier '%s'", repo)
 		}
 	}
 
-	return repos, nil
+	repoList := []string{}
+	for repo := range repos {
+		repoList = append(repoList, repo)
+	}
+
+	return repoList, nil
 
 }
