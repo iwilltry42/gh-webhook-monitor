@@ -48,15 +48,47 @@ type GHAPIResponseInstallationTokenSimplified struct {
 	Permissions         map[string]string `json:"permissions"`
 }
 
-type GitHubAppInstallationToken struct {
-	Token     string
-	ExpiresAt time.Time
+// GHAPIResponseInstallationDetails for /app/installations/{installation_id}
+type GHAPIResponseInstallationDetails struct {
+	ID                  int                  `json:"id"`
+	Account             GHAPIResponseAccount `json:"account"`
+	AccessTokensURL     string               `json:"access_tokens_url"`
+	RepositoriesURL     string               `json:"repositories_url"`
+	HTMLURL             string               `json:"html_url"`
+	AppID               int                  `json:"app_id"`
+	TargetID            int                  `json:"target_id"`
+	TargetType          string               `json:"target_type"`
+	Permissions         map[string]string    `json:"permissions"`
+	Events              []string             `json:"events"`
+	SingleFileName      string               `json:"single_file_name"`
+	RepositorySelection string               `json:"repository_selection"`
+}
+
+type GHAPIResponseAccount struct {
+	Login            string `json:"login"`
+	ID               int    `json:"id"`
+	NodeID           string `json:"node_id"`
+	URL              string `json:"url"`
+	ReposURL         string `json:"repos_url"`
+	EventsURL        string `json:"events_url"`
+	HooksURL         string `json:"hooks_url"`
+	IssuesURL        string `json:"issues_url"`
+	MembersURL       string `json:"members_url"`
+	PublicMembersURL string `json:"public_members_url"`
+	AvatarURL        string `json:"avatar_url"`
+	Description      string `json:"description"`
+}
+
+type GitHubAppInstallation struct {
+	ID                  string
+	Token               string
+	TokenExpirationTime time.Time
+	Organization        string
+	ParentApp           *GitHubApp
 }
 
 // GitHubApp holds all config options that we need to authenticate as a GitHub App installation
 type GitHubApp struct {
-	ID                string
-	InstallationID    string
-	PemFile           string
-	InstallationToken GitHubAppInstallationToken
+	ID      string
+	PemFile string
 }

@@ -13,7 +13,6 @@ import (
 
 	"github.com/iwilltry42/gh-webhook-monitor/pkg/ghapi"
 	"github.com/iwilltry42/gh-webhook-monitor/pkg/metrics"
-	"github.com/iwilltry42/gh-webhook-monitor/pkg/repo"
 	"github.com/iwilltry42/gh-webhook-monitor/pkg/types"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
@@ -23,13 +22,17 @@ var (
 	WebhookTargetRegexp *regexp.Regexp
 )
 
-func configFromEnv() (*ghapi.GitHubApp, *types.TargetRepositoryListConfig, time.Duration, error) {
+func configFromEnv() (*ghapi.GitHubAppInstallation, *types.TargetRepositoryListConfig, time.Duration, error) {
 
 	// Setup GitHub App used for authentication
 	ghApp := ghapi.GitHubApp{
-		ID:             os.Getenv("GWM_GH_APP_ID"),
-		InstallationID: os.Getenv("GWM_GH_APP_INST_ID"),
-		PemFile:        os.Getenv("GWM_GH_APP_PEM"),
+		ID:      os.Getenv("GWM_GH_APP_ID"),
+		PemFile: os.Getenv("GWM_GH_APP_PEM"),
+	}
+
+	ghAppInstallation := ghapi.GitHubAppInstallation{
+		ID:        os.Getenv("GWM_GH_APP_INST_ID"),
+		ParentApp: &ghApp,
 	}
 
 	// wait time: time to wait between iterations
@@ -42,13 +45,12 @@ func configFromEnv() (*ghapi.GitHubApp, *types.TargetRepositoryListConfig, time.
 		var err error
 		waitTime, err = time.ParseDuration(wt)
 		if err != nil {
-			log.Errorf("Failed to parse wait time '%s' to time.Duration format", wt)
-			os.Exit(1)
+			return nil, nil, 0, fmt.Errorf("Failed to parse wait time '%s' to time.Duration format", wt)
 		}
+	}
 
-		if os.Getenv("GWM_DEBUG") != "" {
-			log.SetLevel(log.DebugLevel)
-		}
+	if os.Getenv("GWM_DEBUG") != "" {
+		log.SetLevel(log.DebugLevel)
 	}
 
 	// Regexp to match against webhook target URLs
@@ -64,24 +66,24 @@ func configFromEnv() (*ghapi.GitHubApp, *types.TargetRepositoryListConfig, time.
 	targetRepositoryListConfig.IncludeRepositories = []string{}
 
 	for _, repoURL := range repoURLList {
-		repo, ok := repo.ValidateAndNormalizeRepositoryIdentifier(repoURL)
+		repo, ok := ghapi.ValidateAndNormalizeRepositoryIdentifier(repoURL)
 		if !ok {
 			return nil, nil, 0, fmt.Errorf("Cannot handle repository: Invalid repository identifier '%s'", repoURL)
 		}
 
-		log.Printf("Handling repo '%s'", repo)
+		log.Infof("Handling repo '%s'", repo)
 
 		targetRepositoryListConfig.IncludeRepositories = append(targetRepositoryListConfig.IncludeRepositories, repo)
 	}
 
-	return &ghApp, &targetRepositoryListConfig, waitTime, nil
+	return &ghAppInstallation, &targetRepositoryListConfig, waitTime, nil
 }
 
-func checkWebhooks(ctx context.Context, ghApp *ghapi.GitHubApp, repos []string) {
+func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, repos []string) {
 	// renew token in case it expired
-	if time.Now().After(ghApp.InstallationToken.ExpiresAt) {
+	if time.Now().After(ghAppInstallation.TokenExpirationTime) {
 		log.Debugln("Renewing App Installation Token...")
-		if err := ghApp.RefreshInstallationToken(context.Background()); err != nil {
+		if err := ghAppInstallation.RefreshToken(context.Background()); err != nil {
 			log.Errorln("Failed to get GH App Installation Token")
 			log.Fatalln(err)
 		}
@@ -90,7 +92,7 @@ func checkWebhooks(ctx context.Context, ghApp *ghapi.GitHubApp, repos []string) 
 	// loop through list of repositories
 	for _, repo := range repos {
 		log.Debugf("Getting hooks for repo '%s'...", repo)
-		resp, err := ghApp.DoAPIRequest(http.MethodGet, fmt.Sprintf("/repos/%s/hooks", repo))
+		resp, err := ghAppInstallation.DoAPIRequest(http.MethodGet, fmt.Sprintf("/repos/%s/hooks", repo))
 		if err != nil {
 			log.Errorf("Failed to get hooks for repo '%s'\n%+v", repo, err)
 			metrics.RepositoryFailedWebhookList.WithLabelValues(repo, "requestError").Inc()
@@ -133,26 +135,32 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	// configure application from environment variables
-	ghApp, repoListConfig, waitTime, err := configFromEnv()
+	ghAppInstallation, repoListConfig, waitTime, err := configFromEnv()
 	if err != nil {
 		log.Errorln("Failed to create configuration")
 		log.Fatalln(err)
 	}
 
+	// get some installation details
+	if err := ghAppInstallation.GetDetails(); err != nil {
+		log.Errorln("Failed to get App Installation Details")
+		log.Fatalln(err)
+	}
+
 	// authenticate against GitHub as a GitHub app
-	if err := ghApp.RefreshInstallationToken(context.Background()); err != nil {
+	if err := ghAppInstallation.RefreshToken(context.Background()); err != nil {
 		log.Errorln("Failed to get GH App Installation Token")
 		log.Fatalln(err)
 	}
 
 	// continuously check webhook statuses for all repos
-	go func(ctx context.Context, ghApp *ghapi.GitHubApp, waitTime time.Duration, repositories []string) {
+	go func(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, waitTime time.Duration, repositories []string) {
 		for {
-			checkWebhooks(context.Background(), ghApp, repositories)
+			checkWebhooks(context.Background(), ghAppInstallation, repositories)
 			log.Infof("Waiting for %s...", waitTime)
 			time.Sleep(waitTime)
 		}
-	}(context.Background(), ghApp, waitTime, repoListConfig.IncludeRepositories)
+	}(context.Background(), ghAppInstallation, waitTime, repoListConfig.IncludeRepositories)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 

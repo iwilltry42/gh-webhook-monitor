@@ -1,10 +1,12 @@
-package repo
+package ghapi
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/iwilltry42/gh-webhook-monitor/pkg/types"
 	"github.com/iwilltry42/gh-webhook-monitor/pkg/util"
 )
 
@@ -27,4 +29,24 @@ func ValidateAndNormalizeRepositoryIdentifier(identifier string) (string, bool) 
 
 	// return repo identifier in <owner>/<repo> format
 	return fmt.Sprintf("%s/%s", submatches["owner"], submatches["repo"]), true
+}
+
+func (ghApp *GitHubApp) GetReposByTeamSlug(teamSlug string) ([]string, error) {
+	return nil, nil
+}
+
+// GenerateRepoList generates a list of repositories to target for inspection
+func GenerateRepoList(ctx context.Context, ghApp *GitHubApp, config *types.TargetRepositoryListConfig) ([]string, error) {
+	repos := []string{}
+
+	for _, repo := range config.IncludeRepositories {
+		if r, ok := ValidateAndNormalizeRepositoryIdentifier(repo); ok {
+			repos = append(repos, r)
+		} else {
+			return nil, fmt.Errorf("Failed to validate repository identifier '%s'", repo)
+		}
+	}
+
+	return repos, nil
+
 }

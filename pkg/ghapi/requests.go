@@ -9,14 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// DoTestRequest tries to get a list of repositories accessible using that token
-func (ghApp *GitHubApp) DoTestRequest() error {
-	_, err := ghApp.DoAPIRequest(http.MethodGet, "/installation/repositories")
-	return err
-}
-
-// DoAPIRequest does a request against the GitHub API and returns the response
-func (ghApp *GitHubApp) DoAPIRequest(method, path string) (*http.Response, error) {
+func doAPIRequest(method, path, token string) (*http.Response, error) {
 	// ensure leading slash on path
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
@@ -34,7 +27,7 @@ func (ghApp *GitHubApp) DoAPIRequest(method, path string) (*http.Response, error
 		Method: method,
 		URL:    parsedURL,
 		Header: http.Header{
-			"Authorization": []string{fmt.Sprintf("Bearer %s", ghApp.InstallationToken.Token)},
+			"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
 			"Accept":        []string{"application/vnd.github.v3+json"},
 		},
 	}

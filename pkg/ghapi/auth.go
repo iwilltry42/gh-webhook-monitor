@@ -1,7 +1,6 @@
 package ghapi
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -47,27 +46,6 @@ func generateJWT(appID string, pemFile string) (string, error) {
 	}
 
 	return signedToken, nil
-}
-
-// RefreshInstallationToken uses a JWT token to eventually get an app installation token for git auth
-func (ghApp *GitHubApp) RefreshInstallationToken(ctx context.Context) error {
-	var err error
-
-	appToken, err := generateJWT(ghApp.ID, ghApp.PemFile)
-	if err != nil {
-		return err
-	}
-
-	ghApp.InstallationToken.Token, ghApp.InstallationToken.ExpiresAt, err = getAppInstallationToken(appToken, ghApp.InstallationID)
-	if err != nil {
-		return err
-	}
-
-	if err := ghApp.DoTestRequest(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // getAppInstallationToken requests an app installation token from GitHub
