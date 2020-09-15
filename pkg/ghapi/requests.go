@@ -4,21 +4,29 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
 
-// doTestRequest tries to get a list of repositories accessible using that token
-func doTestRequest(token string) error {
-	_, err := DoRequest(token, "https://api.github.com/installation/repositories", http.MethodGet)
+// DoTestRequest tries to get a list of repositories accessible using that token
+func (ghApp *GitHubApp) DoTestRequest() error {
+	_, err := ghApp.DoAPIRequest(http.MethodGet, "/installation/repositories")
 	return err
 }
 
-// DoRequest does a request against the GitHub API and returns the response
-func DoRequest(token, urlString string, method string) (*http.Response, error) {
-	parsedURL, err := url.Parse(urlString)
+// DoAPIRequest does a request against the GitHub API and returns the response
+func (ghApp *GitHubApp) DoAPIRequest(method, path string) (*http.Response, error) {
+	// ensure leading slash on path
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	// construct URL
+
+	parsedURL, err := url.Parse(GitHubAPIBaseURL + path)
 	if err != nil {
-		log.Errorf("Failed to parse request URL '%s'", urlString)
+		log.Errorf("Failed to parse request URL '%s'", path)
 		return nil, err
 	}
 
@@ -26,7 +34,7 @@ func DoRequest(token, urlString string, method string) (*http.Response, error) {
 		Method: method,
 		URL:    parsedURL,
 		Header: http.Header{
-			"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
+			"Authorization": []string{fmt.Sprintf("Bearer %s", ghApp.InstallationToken.Token)},
 			"Accept":        []string{"application/vnd.github.v3+json"},
 		},
 	}

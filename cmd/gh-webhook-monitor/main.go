@@ -81,7 +81,7 @@ func checkWebhooks(ctx context.Context, ghApp *ghapi.GitHubApp, repos []string) 
 	// renew token in case it expired
 	if time.Now().After(ghApp.InstallationToken.ExpiresAt) {
 		log.Debugln("Renewing App Installation Token...")
-		if err := ghApp.GetInstallationToken(context.Background()); err != nil {
+		if err := ghApp.RefreshInstallationToken(context.Background()); err != nil {
 			log.Errorln("Failed to get GH App Installation Token")
 			log.Fatalln(err)
 		}
@@ -90,10 +90,12 @@ func checkWebhooks(ctx context.Context, ghApp *ghapi.GitHubApp, repos []string) 
 	// loop through list of repositories
 	for _, repo := range repos {
 		log.Debugf("Getting hooks for repo '%s'...", repo)
-		resp, err := ghapi.DoRequest(ghApp.InstallationToken.Token, fmt.Sprintf("https://api.github.com/repos/%s/hooks", repo), http.MethodGet)
+		resp, err := ghApp.DoAPIRequest(http.MethodGet, fmt.Sprintf("/repos/%s/hooks", repo))
 		if err != nil {
-			log.Errorf("Failed to get hooks for repo '%s'", repo)
+			log.Errorf("Failed to get hooks for repo '%s'\n%+v", repo, err)
+			log.Errorf("%+v", ghApp)
 			metrics.RepositoryFailedWebhookList.WithLabelValues(repo, "requestError").Inc()
+			continue
 		}
 
 		var hookResponse []ghapi.GHAPIResponseHook
@@ -102,13 +104,15 @@ func checkWebhooks(ctx context.Context, ghApp *ghapi.GitHubApp, repos []string) 
 		if err != nil {
 			log.Errorln("Failed to read response body\n%w", err)
 			metrics.RepositoryFailedWebhookList.WithLabelValues(repo, "readResponseError").Inc()
+			continue
 		}
 
 		resp.Body.Close()
 
 		if err := json.Unmarshal(respBody, &hookResponse); err != nil {
-			log.Errorf("Failed to unmarshal hook response for repo '%s'", repo)
+			log.Errorf("Failed to unmarshal hook response for repo '%s'\n%+v", repo, err)
 			metrics.RepositoryFailedWebhookList.WithLabelValues(repo, "unmarshalResponseBodyError").Inc()
+			continue
 		}
 
 		for _, hook := range hookResponse {
@@ -118,6 +122,7 @@ func checkWebhooks(ctx context.Context, ghApp *ghapi.GitHubApp, repos []string) 
 			}
 			log.Infof("Repo %s - Hook %s -> %s :: %d", repo, hook.URL, hook.Config.URL, hook.LastResponse.Code)
 			metrics.WebhookLastStatusCode.WithLabelValues(repo, hook.URL, hook.Config.URL, fmt.Sprintf("%d", hook.LastResponse.Code)).Inc()
+			continue
 		}
 	}
 }
@@ -136,7 +141,7 @@ func main() {
 	}
 
 	// authenticate against GitHub as a GitHub app
-	if err := ghApp.GetInstallationToken(context.Background()); err != nil {
+	if err := ghApp.RefreshInstallationToken(context.Background()); err != nil {
 		log.Errorln("Failed to get GH App Installation Token")
 		log.Fatalln(err)
 	}

@@ -49,8 +49,8 @@ func generateJWT(appID string, pemFile string) (string, error) {
 	return signedToken, nil
 }
 
-// GetInstallationToken uses a JWT token to eventually get an app installation token for git auth
-func (ghApp GitHubApp) GetInstallationToken(ctx context.Context) error {
+// RefreshInstallationToken uses a JWT token to eventually get an app installation token for git auth
+func (ghApp *GitHubApp) RefreshInstallationToken(ctx context.Context) error {
 	var err error
 
 	appToken, err := generateJWT(ghApp.ID, ghApp.PemFile)
@@ -63,7 +63,7 @@ func (ghApp GitHubApp) GetInstallationToken(ctx context.Context) error {
 		return err
 	}
 
-	if err := doTestRequest(ghApp.InstallationToken.Token); err != nil {
+	if err := ghApp.DoTestRequest(); err != nil {
 		return err
 	}
 
@@ -73,7 +73,7 @@ func (ghApp GitHubApp) GetInstallationToken(ctx context.Context) error {
 // getAppInstallationToken requests an app installation token from GitHub
 func getAppInstallationToken(appToken, installationID string) (string, time.Time, error) {
 
-	ghURL, err := url.Parse(fmt.Sprintf("https://api.github.com/app/installations/%s/access_tokens", installationID))
+	ghURL, err := url.Parse(fmt.Sprintf("%s/app/installations/%s/access_tokens", GitHubAPIBaseURL, installationID))
 	if err != nil {
 		return "", time.Time{}, err
 	}

@@ -1,6 +1,14 @@
 package ghapi
 
-import "time"
+import (
+	"time"
+)
+
+const (
+	DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com"
+)
+
+var GitHubAPIBaseURL string = DEFAULT_GITHUB_API_BASE_URL
 
 // GHAPIResponseHookLastStatus represents the last_response part of a single webhook item in the GitHub repository webhook API response
 type GHAPIResponseHookLastStatus struct {
