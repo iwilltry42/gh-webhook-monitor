@@ -51,7 +51,7 @@ func generateJWT(appID string, pemFile string) (string, error) {
 }
 
 // getGitHubAppInstallationToken uses a JWT token to eventually get an app installation token for git auth
-func getGitHubAppInstallationToken(ctx context.Context, ghApp types.GitHubApp) (string, time.Time, error) {
+func getGitHubAppInstallationToken(ctx context.Context, ghApp *types.GitHubApp) (string, time.Time, error) {
 	appToken, err := generateJWT(ghApp.ID, ghApp.PemFile)
 	if err != nil {
 		return "", time.Time{}, err
