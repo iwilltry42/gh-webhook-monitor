@@ -5,5 +5,9 @@ labels:
   app: gh-webhook-monitor
 pemSecret: gh-app-pem
 envFromSecret: gh-webhook-monitor
-webhookTargetURLFilterRegexp: ""
-repos: []
+repoFilters:
+  teams: []
+  exclude: []
+  include: []
+webhookFilters:
+  targetUrlRegexp: ""

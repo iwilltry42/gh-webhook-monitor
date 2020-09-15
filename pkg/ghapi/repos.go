@@ -67,7 +67,7 @@ func (ghAppInstallation *GitHubAppInstallation) GetReposByTeamSlug(teamSlug stri
 }
 
 // GenerateRepoList generates a list of repositories to target for inspection
-func GenerateRepoList(ctx context.Context, ghAppInstallation *GitHubAppInstallation, config *types.TargetRepositoryListConfig) ([]string, error) {
+func GenerateRepoList(ctx context.Context, ghAppInstallation *GitHubAppInstallation, config *types.RepositoryConfig) ([]string, error) {
 	log.Debugf("Generating repository list from config:\n%+v", config)
 
 	repos := make(map[string]bool, 1)

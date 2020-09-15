@@ -18,11 +18,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	WebhookTargetRegexp *regexp.Regexp
-)
-
-func configFromEnv() (*ghapi.GitHubAppInstallation, *types.TargetRepositoryListConfig, time.Duration, error) {
+func configFromEnv() (*ghapi.GitHubAppInstallation, *types.RepositoryConfig, *types.WebhookConfig, time.Duration, error) {
 
 	// Setup GitHub App used for authentication
 	ghApp := ghapi.GitHubApp{
@@ -45,7 +41,7 @@ func configFromEnv() (*ghapi.GitHubAppInstallation, *types.TargetRepositoryListC
 		var err error
 		waitTime, err = time.ParseDuration(wt)
 		if err != nil {
-			return nil, nil, 0, fmt.Errorf("Failed to parse wait time '%s' to time.Duration format", wt)
+			return nil, nil, nil, 0, fmt.Errorf("Failed to parse wait time '%s' to time.Duration format", wt)
 		}
 	}
 
@@ -53,22 +49,26 @@ func configFromEnv() (*ghapi.GitHubAppInstallation, *types.TargetRepositoryListC
 		log.SetLevel(log.DebugLevel)
 	}
 
+	// Webhook Configuration
+	webhookConfig := types.WebhookConfig{}
+
 	// Regexp to match against webhook target URLs
-	webhookTargetRegexp := strings.TrimSpace(os.Getenv("GWM_WEBHOOK_TARGET_REGEXP"))
+	webhookTargetRegexp := strings.TrimSpace(os.Getenv("GWM_WEBHOOKS_FILTER_TARGET_REGEXP"))
 	if webhookTargetRegexp != "" {
-		WebhookTargetRegexp = regexp.MustCompile(webhookTargetRegexp)
+		webhookConfig.FilterTargetURLRegexp = regexp.MustCompile(webhookTargetRegexp)
 	}
+	log.Debugf("Webhook Filter Target Regexp '%+v'", webhookConfig.FilterTargetURLRegexp)
 
 	// Generate Repository Search Config
-	targetRepositoryListConfig := types.TargetRepositoryListConfig{}
+	targetRepositoryListConfig := types.RepositoryConfig{}
 
 	targetRepositoryListConfig.IncludeRepositories = strings.Split(os.Getenv("GWM_REPOS_INCLUDE"), ",")
 	targetRepositoryListConfig.FilterTeamSlugs = strings.Split(os.Getenv("GWM_REPOS_FILTER_TEAM_SLUGS"), ",")
 
-	return &ghAppInstallation, &targetRepositoryListConfig, waitTime, nil
+	return &ghAppInstallation, &targetRepositoryListConfig, &webhookConfig, waitTime, nil
 }
 
-func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, repos []string) {
+func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, repos []string, webhookConfig *types.WebhookConfig) {
 	// renew token in case it expired
 	if time.Now().After(ghAppInstallation.TokenExpirationTime) {
 		log.Debugln("Renewing App Installation Token...")
@@ -106,11 +106,11 @@ func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstal
 		}
 
 		for _, hook := range hookResponse {
-			if WebhookTargetRegexp != nil && !WebhookTargetRegexp.MatchString(hook.Config.URL) {
-				log.Infof("Webhook Target URL '%s' does not match provided Regexp ('%s'), ignoring...", hook.Config.URL, WebhookTargetRegexp)
+			if webhookConfig.FilterTargetURLRegexp != nil && !webhookConfig.FilterTargetURLRegexp.MatchString(hook.Config.URL) { // TODO: add function to filter webhooks before continuing
+				log.Debugf("Webhook Target URL '%s' does not match provided Regexp ('%s'), ignoring...", hook.Config.URL, webhookConfig.FilterTargetURLRegexp)
 				continue
 			}
-			log.Infof("Repo %s - Hook %s -> %s :: %d", repo, hook.URL, hook.Config.URL, hook.LastResponse.Code)
+			log.Infof("Repo %s - Hook %s -> Target %s :: Last Status Code %d", repo, hook.URL, hook.Config.URL, hook.LastResponse.Code)
 			metrics.WebhookLastStatusCode.WithLabelValues(repo, hook.URL, hook.Config.URL, fmt.Sprintf("%d", hook.LastResponse.Code)).Inc()
 			continue
 		}
@@ -124,7 +124,7 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	// configure application from environment variables
-	ghAppInstallation, repoListConfig, waitTime, err := configFromEnv()
+	ghAppInstallation, repoListConfig, webhookConfig, waitTime, err := configFromEnv()
 	if err != nil {
 		log.Errorln("Failed to create configuration")
 		log.Fatalln(err)
@@ -149,13 +149,13 @@ func main() {
 	}
 
 	// continuously check webhook statuses for all repos
-	go func(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, waitTime time.Duration, repositories []string) {
+	go func(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, waitTime time.Duration, repositories []string, webhookConfig *types.WebhookConfig) {
 		for {
-			checkWebhooks(context.Background(), ghAppInstallation, repositories)
+			checkWebhooks(context.Background(), ghAppInstallation, repositories, webhookConfig)
 			log.Infof("Waiting for %s...", waitTime)
 			time.Sleep(waitTime)
 		}
-	}(context.Background(), ghAppInstallation, waitTime, repos)
+	}(context.Background(), ghAppInstallation, waitTime, repos, webhookConfig)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 
