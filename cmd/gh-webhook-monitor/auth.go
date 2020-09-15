@@ -1,4 +1,3 @@
-// Package app provides supporting functionality to authenticate as a GitHub App
 package main
 
 import (
@@ -13,9 +12,8 @@ import (
 	"os"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/iwilltry42/gh-webhook-monitor/pkg/types"
-	log "github.com/sirupsen/logrus"
 )
 
 // generateJWT generates a new JSON Web Token out of the App's private pem
@@ -59,7 +57,7 @@ func getGitHubAppInstallationToken(ctx context.Context, ghApp types.GitHubApp) (
 		return "", time.Time{}, err
 	}
 
-	appInstToken, tokenExpirationTime, err := getInstallationToken(appToken, ghApp.InstallationID)
+	appInstToken, tokenExpirationTime, err := getAppInstallationToken(appToken, ghApp.InstallationID)
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -71,8 +69,8 @@ func getGitHubAppInstallationToken(ctx context.Context, ghApp types.GitHubApp) (
 	return appInstToken, tokenExpirationTime, nil
 }
 
-// getInstallationToken requests an app installation token from GitHub
-func getInstallationToken(token, installationID string) (string, time.Time, error) {
+// getAppInstallationToken requests an app installation token from GitHub
+func getAppInstallationToken(appToken, installationID string) (string, time.Time, error) {
 
 	ghURL, err := url.Parse(fmt.Sprintf("https://api.github.com/app/installations/%s/access_tokens", installationID))
 	if err != nil {
@@ -83,7 +81,7 @@ func getInstallationToken(token, installationID string) (string, time.Time, erro
 		Method: http.MethodPost,
 		URL:    ghURL,
 		Header: http.Header{
-			"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
+			"Authorization": []string{fmt.Sprintf("Bearer %s", appToken)},
 			"Accept":        []string{"application/vnd.github.v3+json"},
 		},
 	}
@@ -109,39 +107,4 @@ func getInstallationToken(token, installationID string) (string, time.Time, erro
 	}
 
 	return response.Token, response.ExpiresAt, nil
-}
-
-// doTestRequest tries to get a list of repositories accessible using that token
-func doTestRequest(token string) error {
-	_, err := doRequest(token, "https://api.github.com/installation/repositories", http.MethodGet)
-	return err
-}
-
-// doRequest does a request against the GitHub API and returns the response
-func doRequest(token, urlString string, method string) (*http.Response, error) {
-	parsedURL, err := url.Parse(urlString)
-	if err != nil {
-		log.Errorf("Failed to parse request URL '%s'", urlString)
-		return nil, err
-	}
-
-	var req = &http.Request{
-		Method: method,
-		URL:    parsedURL,
-		Header: http.Header{
-			"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
-			"Accept":        []string{"application/vnd.github.v3+json"},
-		},
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("Request returned non-200 status code (%d)", resp.StatusCode)
-	}
-
-	return resp, nil
 }
