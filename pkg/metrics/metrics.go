@@ -1,4 +1,4 @@
-package main
+package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	webhookLastStatusCode = promauto.NewCounterVec(prometheus.CounterOpts{
+	WebhookLastStatusCode = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "gh_webhook_last_status_code",
 		Help: "The last HTTP status code per webhook",
 	}, []string{
@@ -16,7 +16,7 @@ var (
 		"code",
 	})
 
-	repositoryFailedWebhookList = promauto.NewCounterVec(prometheus.CounterOpts{
+	RepositoryFailedWebhookList = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "gh_webhooks_repository_list_failed_total",
 		Help: "Total number of failed webhook lists per repository",
 	}, []string{

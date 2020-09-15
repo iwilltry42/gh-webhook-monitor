@@ -9,61 +9,11 @@ const (
 	DEFAULT_WAIT_TIME = 5 * time.Minute
 )
 
-// GHRepositoryHookLastResponse represents the last_response part of a single webhook item in the GitHub repository webhook API response
-type GHRepositoryHookLastResponse struct {
-	Code    int    `json:"code"`
-	Status  string `json:"status"`
-	Message string `json:"message"`
-}
-
-type GHRepositoryHookConfig struct {
-	ContentType string `json:"content_type"`
-	InsecureSSL string `json:"insecure_ssl"`
-	URL         string `json:"url"`
-}
-
-// GHRepositoryHook represents a single list item of the GitHub repository webhook API response
-type GHRepositoryHook struct {
-	Type         string                       `json:"type"`
-	ID           int                          `json:"id"`
-	Name         string                       `json:"name"`
-	Active       bool                         `json:"active"`
-	Events       []string                     `json:"events"`
-	Config       GHRepositoryHookConfig       `json:"config"`
-	UpdatedAt    time.Time                    `json:"updated_at"`
-	CreatedAt    time.Time                    `json:"created_at"`
-	URL          string                       `json:"url"`
-	TestURL      string                       `json:"test_url"`
-	PingURL      string                       `json:"ping_url"`
-	LastResponse GHRepositoryHookLastResponse `json:"last_response"`
-}
-
-type GitHubAppInstallationToken struct {
-	Token     string
-	ExpiresAt time.Time
-}
-
-// GitHubApp holds all config options that we need to authenticate as a GitHub App installation
-type GitHubApp struct {
-	ID                string
-	InstallationID    string
-	PemFile           string
-	InstallationToken GitHubAppInstallationToken
-}
-
-type RepositoryListConfig struct {
-	IncludeRepositories        []string
-	ExcludeRepositories        []string
-	IncludeRepositoryRegexp    *regexp.Regexp
-	ExcludeRepositoryRegexp    *regexp.Regexp
-	IncludeRepositoryTeamSlugs []string
-}
-
-// SimplifiedGitHubInstallationAccessTokenResponse is a simple representation of the response you get when requesting
-// a GitHub App installation token (see https://docs.github.com/en/rest/reference/apps#create-an-installation-access-token-for-an-app)
-type SimplifiedGitHubInstallationAccessTokenResponse struct {
-	Token               string            `json:"token"`
-	ExpiresAt           time.Time         `json:"expires_at"`
-	RepositorySelection string            `json:"repository_selection"`
-	Permissions         map[string]string `json:"permissions"`
+// TargetRepositoryListConfig describes the configuration for targeted repositories
+type TargetRepositoryListConfig struct {
+	IncludeRepositories        []string       `mapstructure:"include" yaml:"include"`
+	ExcludeRepositories        []string       `mapstructure:"exclude" yaml:"exclude"`
+	IncludeRepositoryRegexp    *regexp.Regexp `mapstructure:"includeRegexp" yaml:"includeRegexp"`
+	ExcludeRepositoryRegexp    *regexp.Regexp `mapstructure:"excludeRegexp" yaml:"excludeRegexp"`
+	IncludeRepositoryTeamSlugs []string       `mapstructure:"includeTeamSlug" yaml:"includeTeamSlug"`
 }

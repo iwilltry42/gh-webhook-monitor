@@ -1,5 +1,4 @@
-// Package app provides supporting functionality to authenticate as a GitHub App
-package main
+package ghapi
 
 import (
 	"fmt"
@@ -11,12 +10,12 @@ import (
 
 // doTestRequest tries to get a list of repositories accessible using that token
 func doTestRequest(token string) error {
-	_, err := doRequest(token, "https://api.github.com/installation/repositories", http.MethodGet)
+	_, err := DoRequest(token, "https://api.github.com/installation/repositories", http.MethodGet)
 	return err
 }
 
-// doRequest does a request against the GitHub API and returns the response
-func doRequest(token, urlString string, method string) (*http.Response, error) {
+// DoRequest does a request against the GitHub API and returns the response
+func DoRequest(token, urlString string, method string) (*http.Response, error) {
 	parsedURL, err := url.Parse(urlString)
 	if err != nil {
 		log.Errorf("Failed to parse request URL '%s'", urlString)

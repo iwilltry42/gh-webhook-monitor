@@ -1,4 +1,4 @@
-package main
+package ghapi
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/iwilltry42/gh-webhook-monitor/pkg/types"
 )
 
 // generateJWT generates a new JSON Web Token out of the App's private pem
@@ -50,23 +49,25 @@ func generateJWT(appID string, pemFile string) (string, error) {
 	return signedToken, nil
 }
 
-// getGitHubAppInstallationToken uses a JWT token to eventually get an app installation token for git auth
-func getGitHubAppInstallationToken(ctx context.Context, ghApp *types.GitHubApp) (string, time.Time, error) {
+// GetInstallationToken uses a JWT token to eventually get an app installation token for git auth
+func (ghApp GitHubApp) GetInstallationToken(ctx context.Context) error {
+	var err error
+
 	appToken, err := generateJWT(ghApp.ID, ghApp.PemFile)
 	if err != nil {
-		return "", time.Time{}, err
+		return err
 	}
 
-	appInstToken, tokenExpirationTime, err := getAppInstallationToken(appToken, ghApp.InstallationID)
+	ghApp.InstallationToken.Token, ghApp.InstallationToken.ExpiresAt, err = getAppInstallationToken(appToken, ghApp.InstallationID)
 	if err != nil {
-		return "", time.Time{}, err
+		return err
 	}
 
-	if err := doTestRequest(appInstToken); err != nil {
-		return "", time.Time{}, err
+	if err := doTestRequest(ghApp.InstallationToken.Token); err != nil {
+		return err
 	}
 
-	return appInstToken, tokenExpirationTime, nil
+	return nil
 }
 
 // getAppInstallationToken requests an app installation token from GitHub
@@ -101,7 +102,7 @@ func getAppInstallationToken(appToken, installationID string) (string, time.Time
 		return "", time.Time{}, err
 	}
 
-	var response types.SimplifiedGitHubInstallationAccessTokenResponse
+	var response GHAPIResponseInstallationTokenSimplified
 	if err := json.Unmarshal(body, &response); err != nil {
 		return "", time.Time{}, err
 	}
