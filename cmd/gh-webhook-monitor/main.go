@@ -60,10 +60,27 @@ func configFromEnv() (*ghapi.GitHubAppInstallation, *types.RepositoryConfig, *ty
 	log.Debugf("Webhook Filter Target Regexp '%+v'", webhookConfig.FilterTargetURLRegexp)
 
 	// Generate Repository Search Config
-	targetRepositoryListConfig := types.RepositoryConfig{}
+	targetRepositoryListConfig := types.RepositoryConfig{
+		IncludeRepositories: []string{},
+		FilterTeamSlugs:     []string{},
+		ExcludeRepositories: []string{},
+	}
 
-	targetRepositoryListConfig.IncludeRepositories = strings.Split(os.Getenv("GWM_REPOS_INCLUDE"), ",")
-	targetRepositoryListConfig.FilterTeamSlugs = strings.Split(os.Getenv("GWM_REPOS_FILTER_TEAM_SLUGS"), ",")
+	includeRepos := strings.Split(os.Getenv("GWM_REPOS_INCLUDE"), ",")
+	for _, r := range includeRepos {
+		r = strings.TrimSpace(r)
+		if r != "" {
+			targetRepositoryListConfig.IncludeRepositories = append(targetRepositoryListConfig.IncludeRepositories, r)
+		}
+	}
+
+	teamSlugs := strings.Split(os.Getenv("GWM_REPOS_FILTER_TEAM_SLUGS"), ",")
+	for _, ts := range teamSlugs {
+		ts = strings.TrimSpace(ts)
+		if ts != "" {
+			targetRepositoryListConfig.FilterTeamSlugs = append(targetRepositoryListConfig.FilterTeamSlugs, ts)
+		}
+	}
 
 	return &ghAppInstallation, &targetRepositoryListConfig, &webhookConfig, waitTime, nil
 }
