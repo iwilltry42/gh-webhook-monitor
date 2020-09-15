@@ -41,11 +41,11 @@ spec:
             - name: GWM_GH_APP_PEM
               value: /gh/app.pem
             {{- if .Values.webhookTargetURLFilterRegexp }}
-            - name: GWM_WEBHOOK_REGEXP
+            - name: GWM_WEBHOOK_TARGET_REGEXP
               value: {{ .Values.webhookTargetURLFilterRegexp }}
             {{- end }}
             {{- if .Values.repos }}
-            - name: GWM_REPOS
+            - name: GWM_REPOS_INCLUDE
               value: "{{- range $_, $repo := .Values.repos -}}{{$repo}},{{- end -}}"
             {{- end }}
       volumes:

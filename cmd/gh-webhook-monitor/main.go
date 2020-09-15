@@ -11,77 +11,35 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iwilltry42/gh-webhook-monitor/pkg/types"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
 
-// ghRepositoryHookLastResponse represents the last_response part of a single webhook item in the GitHub repository webhook API response
-type ghRepositoryHookLastResponse struct {
-	Code    int    `json:"code"`
-	Status  string `json:"status"`
-	Message string `json:"message"`
-}
-
-type ghRepositoryHookConfig struct {
-	ContentType string `json:"content_type"`
-	InsecureSSL string `json:"insecure_ssl"`
-	URL         string `json:"url"`
-}
-
-// ghRepositoryHook represents a single list item of the GitHub repository webhook API response
-type ghRepositoryHook struct {
-	Type         string                       `json:"type"`
-	ID           int                          `json:"id"`
-	Name         string                       `json:"name"`
-	Active       bool                         `json:"active"`
-	Events       []string                     `json:"events"`
-	Config       ghRepositoryHookConfig       `json:"config"`
-	UpdatedAt    time.Time                    `json:"updated_at"`
-	CreatedAt    time.Time                    `json:"created_at"`
-	URL          string                       `json:"url"`
-	TestURL      string                       `json:"test_url"`
-	PingURL      string                       `json:"ping_url"`
-	LastResponse ghRepositoryHookLastResponse `json:"last_response"`
-}
-
-type GitHubAppInstallationToken struct {
-	Token     string
-	ExpiresAt time.Time
-}
-
-// GitHubApp holds all config options that we need to authenticate as a GitHub App installation
-type GitHubApp struct {
-	ID                string
-	InstallationID    string
-	PemFile           string
-	InstallationToken GitHubAppInstallationToken
-}
-
 var (
-	GHApp         GitHubApp
-	Repositories  []string
-	WebhookRegexp *regexp.Regexp
-	WaitTime      time.Duration
-)
-
-const (
-	DEFAULT_WAIT_TIME = 5 * time.Minute
+	GHApp               types.GitHubApp
+	Repositories        []string
+	WebhookTargetRegexp *regexp.Regexp
+	WaitTime            time.Duration
 )
 
 // repoRegexp matches several variants of repo addresses that can be passed to this application
 var repoRegexp = regexp.MustCompile(`^(?P<protocol>http://|https://|git@)?(?P<github_domain>github\.com)?/?(?P<owner>[A-Za-z0-9-_]+)/(?P<repo>[A-Za-z0-9-_]+)(\.git|/.*)?`)
 
 func configFromEnv() error {
-	GHApp = GitHubApp{
+
+	// Setup GitHub App used for authentication
+	GHApp = types.GitHubApp{
 		ID:             os.Getenv("GWM_GH_APP_ID"),
 		InstallationID: os.Getenv("GWM_GH_APP_INST_ID"),
 		PemFile:        os.Getenv("GWM_GH_APP_PEM"),
 	}
-	repoURLList := strings.Split(os.Getenv("GWM_REPOS"), ",")
+
+	// wait time: time to wait between iterations
 	wt := strings.TrimSpace(os.Getenv("GWM_WAIT_TIME"))
 
 	if wt == "" {
-		WaitTime = DEFAULT_WAIT_TIME
+		WaitTime = types.DEFAULT_WAIT_TIME
 	} else {
 		var err error
 		WaitTime, err = time.ParseDuration(wt)
@@ -91,35 +49,47 @@ func configFromEnv() error {
 		}
 	}
 
-	webhookRegexpStr := strings.TrimSpace(os.Getenv("GWM_WEBHOOK_REGEXP"))
-	if webhookRegexpStr != "" {
-		WebhookRegexp = regexp.MustCompile(webhookRegexpStr)
+	// Regexp to match against webhook target URLs
+	webhookTargetRegexp := strings.TrimSpace(os.Getenv("GWM_WEBHOOK_TARGET_REGEXP"))
+	if webhookTargetRegexp != "" {
+		WebhookTargetRegexp = regexp.MustCompile(webhookTargetRegexp)
 	}
 
-	Repositories = []string{}
+	// Generate List of repositories
+	repoURLList := strings.Split(os.Getenv("GWM_REPOS_INCLUDE"), ",")
+	repositoryListConfig := types.RepositoryListConfig{}
+
+	repositoryListConfig.IncludeRepositories = []string{}
 
 	for _, repoURL := range repoURLList {
-		repoURL = strings.TrimSpace(repoURL)
-
-		if repoURL == "" {
-			continue
+		repo, ok := validateAndNormalizeRepositoryIdentifier(repoURL)
+		if !ok {
+			return fmt.Errorf("Cannot handle repository: Invalid repository identifier '%s'", repoURL)
 		}
-
-		match := repoRegexp.FindStringSubmatch(repoURL)
-		if len(match) == 0 {
-			return fmt.Errorf("Failed to match repo regexp on repo %s", repoURL)
-		}
-
-		submatches := mapSubexpNames(repoRegexp.SubexpNames(), match)
-
-		repo := fmt.Sprintf("%s/%s", submatches["owner"], submatches["repo"])
 
 		log.Printf("Handling repo '%s'", repo)
 
-		Repositories = append(Repositories, repo)
+		repositoryListConfig.IncludeRepositories = append(repositoryListConfig.IncludeRepositories, repo)
 	}
 
 	return nil
+}
+
+func validateAndNormalizeRepositoryIdentifier(identifier string) (string, bool) {
+	// trim leading and trailing whitespaces
+	identifier = strings.TrimSpace(identifier)
+
+	// match identifier against regexp
+	match := repoRegexp.FindStringSubmatch(identifier)
+	if len(match) == 0 {
+		return identifier, false
+	}
+
+	// get matching groups from regexp
+	submatches := mapSubexpNames(repoRegexp.SubexpNames(), match)
+
+	// return repo identifier in <owner>/<repo> format
+	return fmt.Sprintf("%s/%s", submatches["owner"], submatches["repo"]), true
 }
 
 func checkWebhooks() {
@@ -143,7 +113,7 @@ func checkWebhooks() {
 				repositoryFailedWebhookList.WithLabelValues(repo, "requestError").Inc()
 			}
 
-			var hookResponse []ghRepositoryHook
+			var hookResponse []types.GHRepositoryHook
 
 			respBody, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
@@ -159,8 +129,8 @@ func checkWebhooks() {
 			}
 
 			for _, hook := range hookResponse {
-				if WebhookRegexp != nil && !WebhookRegexp.MatchString(hook.Config.URL) {
-					log.Infof("Webhook Target URL '%s' does not match provided Regexp ('%s'), ignoring...", hook.Config.URL, WebhookRegexp)
+				if WebhookTargetRegexp != nil && !WebhookTargetRegexp.MatchString(hook.Config.URL) {
+					log.Infof("Webhook Target URL '%s' does not match provided Regexp ('%s'), ignoring...", hook.Config.URL, WebhookTargetRegexp)
 					continue
 				}
 				log.Infof("Repo %s - Hook %s -> %s :: %d", repo, hook.URL, hook.Config.URL, hook.LastResponse.Code)
