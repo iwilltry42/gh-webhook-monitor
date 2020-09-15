@@ -40,13 +40,21 @@ spec:
           env:
             - name: GWM_GH_APP_PEM
               value: /gh/app.pem
-            {{- if .Values.webhookTargetURLFilterRegexp }}
-            - name: GWM_WEBHOOK_TARGET_REGEXP
-              value: {{ .Values.webhookTargetURLFilterRegexp }}
+            {{- if .Values.webhookFilters.targetURLRegexp }}
+            - name: GWM_WEBHOOK_FILTERS_TARGET_REGEXP
+              value: {{ .Values.webhookFilters.targetURLRegexp }}
             {{- end }}
-            {{- if .Values.repos }}
+            {{- if .Values.repoFilters.include }}
             - name: GWM_REPOS_INCLUDE
-              value: "{{- range $_, $repo := .Values.repos -}}{{$repo}},{{- end -}}"
+              value: "{{- range $_, $repo := .Values.repoFilters.include -}}{{$repo}},{{- end -}}"
+            {{- end }}
+            {{- if .Values.repoFilters.exclude }}
+            - name: GWM_REPOS_EXCLUDE
+              value: "{{- range $_, $repo := .Values.repoFilters.exclude -}}{{$repo}},{{- end -}}"
+            {{- end }}
+            {{- if .Values.repoFilters.teams }}
+            - name: GWM_REPOS_FILTER_TEAM_SLUGS
+              value: "{{- range $_, $repo := .Values.repoFilters.teams -}}{{$repo}},{{- end -}}"
             {{- end }}
       volumes:
         - name: gh-app-pem
