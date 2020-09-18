@@ -10,7 +10,7 @@ spec:
     - name: GitHubWebhooks
       rules:
         - alert: Non2XXStatusCode
-          expr: gh_webhook_last_status_code_group{code_group!~"2xx|unused", status="active"} > 1
+          expr: gh_webhook_last_status_code_group{code_group!~"2xx|unused", status="active"} > 0
           {{- if .Values.alertLabels }}
           labels:
             {{- toYaml .Values.alertLabels | nindent 12 }}
