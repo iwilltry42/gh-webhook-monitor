@@ -3,4 +3,4 @@ name: gh-webhook-monitor
 description: GitHub Repository Webhook Monitor
 type: application
 version: 0.2.0
-appVersion: 0.0.6
+appVersion: 0.1.0

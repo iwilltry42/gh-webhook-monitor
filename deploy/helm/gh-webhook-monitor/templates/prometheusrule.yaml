@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    {{- toYaml .Values.labels | nindent 4 }}
+  name: {{ .Values.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  groups:
+    - name: gh-webhooks
+      rules:
+        - alert: Non2XXStatusCode
+          expr: gh_webhook_last_status_code_group{code_group!~"2xx|unused", status="active"} > 1
+          {{- if .Values.alertLabels }}
+          labels:
+            {{- toYaml .Values.alertLabels | nindent 12 }}
+          {{- end }}
+          annotations:
+            summary: "Last seen status code for active/used webhook {{ $labels.webhook }} was non-2xx!"
+            description: "A non-2xx ({{ $labels.code_group }}) status code was returned for a webhook in repo {{ $labels.repository }}"

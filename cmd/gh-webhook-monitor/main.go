@@ -101,7 +101,7 @@ func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstal
 		resp, err := ghAppInstallation.DoAPIRequest(http.MethodGet, fmt.Sprintf("/repos/%s/hooks", repo))
 		if err != nil {
 			log.Errorf("Failed to get hooks for repo '%s'\n%+v", repo, err)
-			metrics.RepositoryFailedWebhookList.WithLabelValues(repo, "requestError").Inc()
+			metrics.RepositoryFailedWebhookListTotal.WithLabelValues(repo, "requestError").Inc()
 			continue
 		}
 
@@ -110,7 +110,7 @@ func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstal
 		respBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			log.Errorf("Failed to read response body\n%+v", err)
-			metrics.RepositoryFailedWebhookList.WithLabelValues(repo, "readResponseError").Inc()
+			metrics.RepositoryFailedWebhookListTotal.WithLabelValues(repo, "readResponseError").Inc()
 			continue
 		}
 
@@ -118,7 +118,7 @@ func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstal
 
 		if err := json.Unmarshal(respBody, &hookResponse); err != nil {
 			log.Errorf("Failed to unmarshal hook response for repo '%s'\n%+v", repo, err)
-			metrics.RepositoryFailedWebhookList.WithLabelValues(repo, "unmarshalResponseBodyError").Inc()
+			metrics.RepositoryFailedWebhookListTotal.WithLabelValues(repo, "unmarshalResponseBodyError").Inc()
 			continue
 		}
 
@@ -127,8 +127,24 @@ func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstal
 				log.Debugf("Webhook Target URL '%s' does not match provided Regexp ('%s'), ignoring...", hook.Config.URL, webhookConfig.FilterTargetURLRegexp)
 				continue
 			}
-			log.Infof("Repo %s - Hook %s -> Target %s :: Last Status Code %d", repo, hook.URL, hook.Config.URL, hook.LastResponse.Code)
-			metrics.WebhookLastStatusCode.WithLabelValues(repo, hook.URL, hook.Config.URL, fmt.Sprintf("%d", hook.LastResponse.Code)).Inc()
+			log.Infof("Repo %s - Hook %s -> Target %s :: Last Status Code %d (msg: %s)", repo, hook.URL, hook.Config.URL, hook.LastResponse.Code, hook.LastResponse.Status)
+
+			// CodeGroup
+			var cgFound *metrics.CodeGroup
+			for _, cg := range metrics.CodeGroups {
+				if hook.LastResponse.Code >= cg.LowerBound && hook.LastResponse.Code <= cg.LowerBound {
+					metrics.WebhookLastStatusCodeGroup.WithLabelValues(repo, hook.URL, hook.Config.URL, hook.LastResponse.Status, cg.Name).Set(1)
+					cgFound = &cg
+				} else {
+					metrics.WebhookLastStatusCodeGroup.WithLabelValues(repo, hook.URL, hook.Config.URL, hook.LastResponse.Status, cg.Name).Set(0)
+				}
+			}
+			if cgFound == nil {
+				metrics.WebhookLastStatusCodeGroup.WithLabelValues(repo, hook.URL, hook.Config.URL, hook.LastResponse.Status, metrics.CodeGroupOthers.Name).Set(1)
+				metrics.WebhookLastStatusCodeTotal.WithLabelValues(repo, hook.URL, hook.Config.URL, hook.LastResponse.Status, fmt.Sprintf("%d", hook.LastResponse.Code), metrics.CodeGroupOthers.Name).Inc()
+			} else {
+				metrics.WebhookLastStatusCodeTotal.WithLabelValues(repo, hook.URL, hook.Config.URL, hook.LastResponse.Status, fmt.Sprintf("%d", hook.LastResponse.Code), cgFound.Name).Inc()
+			}
 			continue
 		}
 	}
