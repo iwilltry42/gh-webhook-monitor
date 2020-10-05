@@ -184,7 +184,15 @@ func main() {
 	// continuously check webhook statuses for all repos
 	go func(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, waitTime time.Duration, repositories []string, webhookConfig *types.WebhookConfig) {
 		for {
-			checkWebhooks(context.Background(), ghAppInstallation, repositories, webhookConfig)
+			apiRate, err := ghAppInstallation.GetAPIRateLimit()
+			if err != nil {
+				log.Errorf("Failed to get Rate Limit data from API: %+v", err)
+			}
+			reset := time.Unix(apiRate.Reset, 0)
+			log.Infof("API Rate Limit Usage: %d/%d remaining, resets at %s", apiRate.Remaining, apiRate.Limit, reset)
+			metrics.APIRateLimitRemaining.WithLabelValues(ghAppInstallation.ParentApp.ID, ghAppInstallation.ID).Set(float64(apiRate.Remaining))
+
+			checkWebhooks(ctx, ghAppInstallation, repositories, webhookConfig)
 			log.Infof("Waiting for %s...", waitTime)
 			time.Sleep(waitTime)
 		}

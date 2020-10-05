@@ -23,6 +23,44 @@ type GHAPIResponseHookConfig struct {
 	URL         string `json:"url"`
 }
 
+type GHAPIRate struct {
+	Limit     int   `json:"limit"`
+	Remaining int   `json:"remaining"`
+	Reset     int64 `json:"reset"`
+}
+
+// GHAPIResponseRateLimit represents the API Response for the /rate_limit API
+type GHAPIResponseRateLimit struct {
+	Resources struct {
+		Core struct {
+			Limit     int `json:"limit"`
+			Remaining int `json:"remaining"`
+			Reset     int `json:"reset"`
+		} `json:"core"`
+		Search struct {
+			Limit     int `json:"limit"`
+			Remaining int `json:"remaining"`
+			Reset     int `json:"reset"`
+		} `json:"search"`
+		Graphql struct {
+			Limit     int `json:"limit"`
+			Remaining int `json:"remaining"`
+			Reset     int `json:"reset"`
+		} `json:"graphql"`
+		IntegrationManifest struct {
+			Limit     int `json:"limit"`
+			Remaining int `json:"remaining"`
+			Reset     int `json:"reset"`
+		} `json:"integration_manifest"`
+		CodeScanningUpload struct {
+			Limit     int `json:"limit"`
+			Remaining int `json:"remaining"`
+			Reset     int `json:"reset"`
+		} `json:"code_scanning_upload"`
+	} `json:"resources"`
+	Rate GHAPIRate `json:"rate"`
+}
+
 // GHAPIResponseHook represents a single list item of the GitHub repository webhook API response
 type GHAPIResponseHook struct {
 	Type         string                      `json:"type"`

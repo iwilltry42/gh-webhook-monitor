@@ -81,4 +81,12 @@ var (
 		"repository",
 		"error",
 	})
+
+	APIRateLimitRemaining = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "gh_webhook_api_rate_limit_remaining",
+		Help: "Remaining API Requests before hitting the limit",
+	}, []string{
+		"app_id",
+		"installation_id",
+	})
 )

@@ -66,3 +66,24 @@ func (ghAppInstallation *GitHubAppInstallation) GetDetails() error {
 	return nil
 
 }
+
+// GetAPIRateLimit fills the GitHub App Installation with some required details (like organization)
+func (ghAppInstallation *GitHubAppInstallation) GetAPIRateLimit() (GHAPIRate, error) {
+	resp, err := ghAppInstallation.DoAPIRequest(http.MethodGet, "/rate_limit")
+	if err != nil {
+		return GHAPIRate{}, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return GHAPIRate{}, err
+	}
+
+	var response GHAPIResponseRateLimit
+	if err := json.Unmarshal(body, &response); err != nil {
+		return GHAPIRate{}, err
+	}
+
+	return response.Rate, nil
+}
