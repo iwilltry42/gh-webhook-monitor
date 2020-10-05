@@ -109,6 +109,9 @@ func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstal
 		}
 	}
 
+	// Reset Metrics, where needed
+	metrics.WebhookLastStatusCodeGroup.Reset() // reset all metrics in this vector
+
 	// loop through list of repositories
 	for _, repo := range repos {
 		log.Debugf("Getting hooks for repo '%s'...", repo)
@@ -145,7 +148,6 @@ func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstal
 
 			// CodeGroup
 			var cgFound *metrics.CodeGroup
-			metrics.WebhookLastStatusCodeGroup.Reset() // reset all metrics in this vector
 			for _, cg := range metrics.CodeGroups {
 				if hook.LastResponse.Code >= cg.LowerBound && hook.LastResponse.Code <= cg.LowerBound {
 					metrics.WebhookLastStatusCodeGroup.WithLabelValues(repo, hook.URL, hook.Config.URL, hook.LastResponse.Status, cg.Name).Set(1)
