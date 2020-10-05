@@ -89,4 +89,13 @@ var (
 		"app_id",
 		"installation_id",
 	})
+
+	RepositoryListCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "gh_webhook_repositories",
+		Help: "Number of Repositories checked by the Exporter",
+	}, []string{
+		"team_filters",
+		"include_filters",
+		"exclude_filters",
+	})
 )

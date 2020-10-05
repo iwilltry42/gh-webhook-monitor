@@ -18,7 +18,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func configFromEnv() (*ghapi.GitHubAppInstallation, *types.RepositoryConfig, *types.WebhookConfig, time.Duration, error) {
+func configFromEnv() (*ghapi.GitHubAppInstallation, *types.RepositoryConfig, *types.WebhookConfig, time.Duration, time.Duration, error) {
 
 	// Setup GitHub App used for authentication
 	ghApp := ghapi.GitHubApp{
@@ -41,7 +41,21 @@ func configFromEnv() (*ghapi.GitHubAppInstallation, *types.RepositoryConfig, *ty
 		var err error
 		waitTime, err = time.ParseDuration(wt)
 		if err != nil {
-			return nil, nil, nil, 0, fmt.Errorf("Failed to parse wait time '%s' to time.Duration format", wt)
+			return nil, nil, nil, 0, 0, fmt.Errorf("Failed to parse wait time '%s' to time.Duration format", wt)
+		}
+	}
+
+	// repo refresh wait time: time to wait before refreshing the list of repositories again
+	rrwt := strings.TrimSpace(os.Getenv("GWM_REPO_REFRESH_WAIT_TIME"))
+
+	var repoRefreshWaitTime time.Duration
+	if rrwt == "" {
+		repoRefreshWaitTime = types.DEFAULT_REPO_REFRESH_WAIT_TIME
+	} else {
+		var err error
+		repoRefreshWaitTime, err = time.ParseDuration(rrwt)
+		if err != nil {
+			return nil, nil, nil, 0, 0, fmt.Errorf("Failed to parse repo refresh wait time '%s' to time.Duration format", rrwt)
 		}
 	}
 
@@ -82,7 +96,7 @@ func configFromEnv() (*ghapi.GitHubAppInstallation, *types.RepositoryConfig, *ty
 		}
 	}
 
-	return &ghAppInstallation, &targetRepositoryListConfig, &webhookConfig, waitTime, nil
+	return &ghAppInstallation, &targetRepositoryListConfig, &webhookConfig, waitTime, repoRefreshWaitTime, nil
 }
 
 func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, repos []string, webhookConfig *types.WebhookConfig) {
@@ -157,7 +171,7 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	// configure application from environment variables
-	ghAppInstallation, repoListConfig, webhookConfig, waitTime, err := configFromEnv()
+	ghAppInstallation, repoListConfig, webhookConfig, waitTime, repoRefreshWaitTime, err := configFromEnv()
 	if err != nil {
 		log.Errorln("Failed to create configuration")
 		log.Fatalln(err)
@@ -175,14 +189,45 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	var repos []string
+
 	// get list of repositories
-	repos, err := ghapi.GenerateRepoList(context.Background(), ghAppInstallation, repoListConfig)
+	repos, err = ghapi.GenerateRepoList(context.Background(), ghAppInstallation, repoListConfig)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
+	// Prepare Label Values for the Repo List Metric
+
+	teamSlugsStr := strings.Join(repoListConfig.FilterTeamSlugs, "|")
+	var includeFiltersStr string
+	var excludeFiltersStr string
+	if repoListConfig.IncludeRepositoryRegexp != nil {
+		includeFiltersStr = strings.Join(append(repoListConfig.IncludeRepositories, repoListConfig.IncludeRepositoryRegexp.String()), "|")
+	} else {
+		includeFiltersStr = strings.Join(repoListConfig.IncludeRepositories, "|")
+	}
+	if repoListConfig.ExcludeRepositoryRegexp != nil {
+		excludeFiltersStr = strings.Join(append(repoListConfig.ExcludeRepositories, repoListConfig.ExcludeRepositoryRegexp.String()), "|")
+	} else {
+		excludeFiltersStr = strings.Join(repoListConfig.ExcludeRepositories, "|")
+	}
+	// update list of repositories every now and then
+	go func(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, waitTime time.Duration, repoListConfig *types.RepositoryConfig) {
+		for {
+			var err error
+			repos, err = ghapi.GenerateRepoList(ctx, ghAppInstallation, repoListConfig)
+			if err != nil {
+				log.Errorf("Failed to refresh list of repositories: %+v", err)
+			}
+			metrics.RepositoryListCount.WithLabelValues(teamSlugsStr, includeFiltersStr, excludeFiltersStr).Set(float64(len(repos)))
+			log.Infof("Refreshed Repository List: Found %d repositories -> Next refresh in %s...", len(repos), waitTime)
+			time.Sleep(waitTime)
+		}
+	}(context.Background(), ghAppInstallation, repoRefreshWaitTime, repoListConfig)
+
 	// continuously check webhook statuses for all repos
-	go func(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, waitTime time.Duration, repositories []string, webhookConfig *types.WebhookConfig) {
+	go func(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstallation, waitTime time.Duration, webhookConfig *types.WebhookConfig) {
 		for {
 			apiRate, err := ghAppInstallation.GetAPIRateLimit()
 			if err != nil {
@@ -192,11 +237,11 @@ func main() {
 			log.Infof("API Rate Limit Usage: %d/%d remaining, resets at %s", apiRate.Remaining, apiRate.Limit, reset)
 			metrics.APIRateLimitRemaining.WithLabelValues(ghAppInstallation.ParentApp.ID, ghAppInstallation.ID).Set(float64(apiRate.Remaining))
 
-			checkWebhooks(ctx, ghAppInstallation, repositories, webhookConfig)
-			log.Infof("Waiting for %s...", waitTime)
+			checkWebhooks(ctx, ghAppInstallation, repos, webhookConfig)
+			log.Infof("Processed webhooks for %d repositories -> Next iteration in %s...", len(repos), waitTime)
 			time.Sleep(waitTime)
 		}
-	}(context.Background(), ghAppInstallation, waitTime, repos, webhookConfig)
+	}(context.Background(), ghAppInstallation, waitTime, webhookConfig)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 

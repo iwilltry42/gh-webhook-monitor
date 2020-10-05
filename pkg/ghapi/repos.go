@@ -37,7 +37,7 @@ func ValidateAndNormalizeRepositoryIdentifier(identifier string) (string, bool) 
 }
 
 func (ghAppInstallation *GitHubAppInstallation) GetReposByTeamSlug(teamSlug string) ([]string, error) {
-	resp, err := ghAppInstallation.DoAPIRequest(http.MethodGet, fmt.Sprintf("/orgs/%s/teams/%s/repos", ghAppInstallation.Organization, teamSlug))
+	resp, err := ghAppInstallation.DoAPIRequest(http.MethodGet, fmt.Sprintf("/orgs/%s/teams/%s/repos?per_page=100", ghAppInstallation.Organization, teamSlug))
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +79,7 @@ func GenerateRepoList(ctx context.Context, ghAppInstallation *GitHubAppInstallat
 			if err != nil {
 				return nil, err
 			}
+			log.Debugf("Found %d repos for team '%s'", len(newRepos), teamSlug)
 
 			// only add repos that are not already in the list
 			for _, newRepo := range newRepos {
@@ -115,6 +116,8 @@ func GenerateRepoList(ctx context.Context, ghAppInstallation *GitHubAppInstallat
 	for repo := range repos {
 		repoList = append(repoList, repo)
 	}
+
+	log.Debugf("Filtered repo list contains %d repos", len(repoList))
 
 	return repoList, nil
 

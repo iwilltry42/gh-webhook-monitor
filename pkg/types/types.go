@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	DEFAULT_WAIT_TIME = 5 * time.Minute
+	DEFAULT_WAIT_TIME              = 5 * time.Minute
+	DEFAULT_REPO_REFRESH_WAIT_TIME = 1 * time.Hour
 )
 
 // RepositoryConfig describes the configuration for targeted repositories
