@@ -19,4 +19,8 @@ spec:
             summary: |-
               '{{`Last seen status code for active/used webhook {{ $labels.webhook }} was non-2xx!`}}'
             description: |-
-              '{{`A non-2xx ({{ $labels.code_group }}) status code was returned for a webhook in repo {{ $labels.repository }}`}}'
+              {{`
+              A non-2xx ({{ $labels.code_group }}) status code was returned for a webhook in repo <https://github.com/{{ $labels.repository }}/settings/hooks|{{ $labels.repository }}>
+              Webhook: <https://github.com/{{ $labels.repository }}/settings/hooks/{{ $labels.webhook_id }}
+              `}}
+

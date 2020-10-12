@@ -57,6 +57,7 @@ var (
 	}, []string{
 		"repository",
 		"webhook",
+		"webhook_id",
 		"target",
 		"status",
 		"code",
@@ -69,6 +70,7 @@ var (
 	}, []string{
 		"repository",
 		"webhook",
+		"webhook_id",
 		"target",
 		"status",
 		"code_group",

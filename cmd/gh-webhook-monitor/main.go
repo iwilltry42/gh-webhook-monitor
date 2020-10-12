@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -150,16 +151,16 @@ func checkWebhooks(ctx context.Context, ghAppInstallation *ghapi.GitHubAppInstal
 			var cgFound *metrics.CodeGroup
 			for _, cg := range metrics.CodeGroups {
 				if hook.LastResponse.Code >= cg.LowerBound && hook.LastResponse.Code <= cg.LowerBound {
-					metrics.WebhookLastStatusCodeGroup.WithLabelValues(repo, hook.URL, hook.Config.URL, hook.LastResponse.Status, cg.Name).Set(1)
+					metrics.WebhookLastStatusCodeGroup.WithLabelValues(repo, hook.URL, hook.Config.URL, strconv.Itoa(hook.ID), hook.LastResponse.Status, cg.Name).Set(1)
 					cgFound = &cg
 					break
 				}
 			}
 			if cgFound == nil {
-				metrics.WebhookLastStatusCodeGroup.WithLabelValues(repo, hook.URL, hook.Config.URL, hook.LastResponse.Status, metrics.CodeGroupOthers.Name).Set(1)
-				metrics.WebhookLastStatusCodeTotal.WithLabelValues(repo, hook.URL, hook.Config.URL, hook.LastResponse.Status, fmt.Sprintf("%d", hook.LastResponse.Code), metrics.CodeGroupOthers.Name).Inc()
+				metrics.WebhookLastStatusCodeGroup.WithLabelValues(repo, hook.URL, hook.Config.URL, strconv.Itoa(hook.ID), hook.LastResponse.Status, metrics.CodeGroupOthers.Name).Set(1)
+				metrics.WebhookLastStatusCodeTotal.WithLabelValues(repo, hook.URL, hook.Config.URL, strconv.Itoa(hook.ID), hook.LastResponse.Status, fmt.Sprintf("%d", hook.LastResponse.Code), metrics.CodeGroupOthers.Name).Inc()
 			} else {
-				metrics.WebhookLastStatusCodeTotal.WithLabelValues(repo, hook.URL, hook.Config.URL, hook.LastResponse.Status, fmt.Sprintf("%d", hook.LastResponse.Code), cgFound.Name).Inc()
+				metrics.WebhookLastStatusCodeTotal.WithLabelValues(repo, hook.URL, hook.Config.URL, strconv.Itoa(hook.ID), hook.LastResponse.Status, fmt.Sprintf("%d", hook.LastResponse.Code), cgFound.Name).Inc()
 			}
 			continue
 		}
