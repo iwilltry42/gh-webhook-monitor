@@ -89,6 +89,14 @@ func configFromEnv() (*ghapi.GitHubAppInstallation, *types.RepositoryConfig, *ty
 		}
 	}
 
+	excludeRepos := strings.Split(os.Getenv("GWM_REPOS_EXCLUDE"), ",")
+	for _, r := range excludeRepos {
+		r = strings.TrimSpace(r)
+		if r != "" {
+			targetRepositoryListConfig.ExcludeRepositories = append(targetRepositoryListConfig.ExcludeRepositories, r)
+		}
+	}
+
 	teamSlugs := strings.Split(os.Getenv("GWM_REPOS_FILTER_TEAM_SLUGS"), ",")
 	for _, ts := range teamSlugs {
 		ts = strings.TrimSpace(ts)
@@ -197,6 +205,7 @@ func main() {
 	// get list of repositories
 	repos, err = ghapi.GenerateRepoList(context.Background(), ghAppInstallation, repoListConfig)
 	if err != nil {
+		log.Errorln("Failed to generate repo list")
 		log.Fatalln(err)
 	}
 
